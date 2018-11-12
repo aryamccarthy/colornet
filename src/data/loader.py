@@ -9,9 +9,9 @@ import sys
 class DataLoader:
     def __init__(self, raw_dir, file_dir):
         self.raw_dir = raw_dir
-        self.quant_file = os.path.join(file_dir, "quantifiers.col")
-        self.comp_file = os.path.join(file_dir, "comparatives.col")
-        self.color_file = os.path.join(file_dir, "colors.csv")
+        self.quant_file = os.path.join(file_dir, "quantifiers.txt")
+        self.comp_file = os.path.join(file_dir, "comparatives.txt")
+        self.color_file = os.path.join(file_dir, "words_to_labels.txt")
         
         self.get_refs_from_file()
 
@@ -129,9 +129,6 @@ def read_csv(path, delimiter = ","):
 
 
 if __name__ == "__main__":
-    colors_path = "/Users/Elias/colornet/data/raw/colors.csv"
-    quant_path = "/Users/Elias/colornet/data/raw/quantifiers.col"
-    comp_path = "/Users/Elias/colornet/data/raw/comparatives.col"
     dl = DataLoader("/Users/Elias/colornet/data/raw/xkcd_colordata", "/Users/Elias/colornet/data/raw/")
     batch = dl.load_full_batch()
     print(batch["green"])
