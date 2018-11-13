@@ -129,7 +129,7 @@ def read_csv(path, delimiter = ","):
 
 
 if __name__ == "__main__":
-    dl = DataLoader("/Users/Elias/colornet/data/raw/xkcd_colordata", "/Users/Elias/colornet/data/raw/")
+    dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/")
     batch = dl.load_full_batch()
     print(batch["green"])
 
