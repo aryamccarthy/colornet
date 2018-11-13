@@ -59,18 +59,17 @@ class DataLoader:
         self.refs = all_refs
 
 
-    def load_full_batch(self):
+    def load_full_batch(self, split="train"):
         # subset these for now
-        SUBSET = ["blue", "green", "yellow", "red"]
+        SUBSET = ["blue", "green", "yellow", "red", "gray", "orange", "purple"]
         refs_to_colors = defaultdict(list)
         for ref in self.refs:
             if ref in SUBSET:
                 for space_str, filename in self.color_lines:
                     if ref in filename and filename != ref:
                         refs_to_colors[ref].append((space_str, filename))
-        color_to_avgs = self.get_avgs([x[1] for x in self.color_lines])
+        color_to_avgs = self.get_avgs([x[1] for x in self.color_lines], split)
         # dict to return:
-        # {ref_name: {color_name:  avg }}
         # {ref_name: ref_dict}
         # ref_dict: {reference: avg, comparative: str, target: avg}
         final_dict = defaultdict(list)
@@ -83,39 +82,37 @@ class DataLoader:
                         color_avg = color_to_avgs[color]
                         ref_dict = {"reference": ref_avg, "comparative": comparative_name, "target": color_avg}
                         final_dict[ref].append(ref_dict)
-                        #final_dict[ref].update({color: color_to_avgs[color]})
         return final_dict
     
     def get_comp_name(self, space_str):
         # check quant and comp for non-color part of spacestr
         not_color = space_str.split(" ")[0]
-        print(not_color)
         # make quant and comp_dict
-        if not_color in self.quant_dict.keys():
-            adj = self.quant_dict[not_color]
-        elif not_color in self.comp_dict.keys():
-            adj = "more {}".format(self.comp_dict[not_color])
+        if not_color in self.comp_dict.keys():
+            adj = self.comp_dict[not_color]
+        elif not_color in self.quant_dict.keys():
+            adj = "more {}".format(self.quant_dict[not_color])
         else:
             return None
         return adj
 
-    def get_pkls(self, ref_to_colors):
+    def get_pkls(self, ref_to_colors, split="train"):
         refs_to_avgs = defaultdict(list)
         for ref, color_list in ref_to_colors.items():
             for  color in color_list:
                 try:
-                    with open(os.path.join(self.raw_dir, color + ".train"), "rb") as f1:
+                    with open(os.path.join(self.raw_dir, color + "."+split), "rb") as f1:
                         full_rgb = np.array(pickle.load(f1))
                         refs_to_avgs[ref].append(np.mean(full_rgb, axis=0))
                 except FileNotFoundError:
                     continue
         return refs_to_avgs
 
-    def get_avgs(self, colors):
+    def get_avgs(self, colors, split):
         color_to_avgs = defaultdict(list)
         for color in colors:
             try:
-                with open(os.path.join(self.raw_dir, color+ ".train"), "rb") as f1:
+                with open(os.path.join(self.raw_dir, color+ "."+split), "rb") as f1:
                     full_rgb = np.array(pickle.load(f1))
                     color_to_avgs[color] = np.mean(full_rgb, axis=0)
             except FileNotFoundError:
@@ -130,6 +127,11 @@ def read_csv(path, delimiter = ","):
 
 if __name__ == "__main__":
     dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/")
-    batch = dl.load_full_batch()
-    print(batch["green"])
+    train_batch = dl.load_full_batch("train")
+    test_batch = dl.load_full_batch("test")
+    dev_batch = dl.load_full_batch("dev")
+#    print(train_batch["green"])
+    print(test_batch["purple"])
+    #print(dev_batch["blue"])
+
 
