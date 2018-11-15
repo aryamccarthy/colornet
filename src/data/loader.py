@@ -6,6 +6,11 @@ import csv
 import pickle
 import sys
 
+
+# get current estimate of subset
+with open("predcolor.txt") as f1:
+    SUBSET = [x.strip() for x in f1.readlines()]
+#SUBSET = ["blue", "green", "yellow", "red", "gray", "orange", "purple"]
 class DataLoader:
     def __init__(self, raw_dir, file_dir):
         self.raw_dir = raw_dir
@@ -61,7 +66,6 @@ class DataLoader:
 
     def load_full_batch(self, split="train"):
         # subset these for now
-        SUBSET = ["blue", "green", "yellow", "red", "gray", "orange", "purple"]
         refs_to_colors = defaultdict(list)
         for ref in self.refs:
             if ref in SUBSET:
@@ -130,8 +134,8 @@ if __name__ == "__main__":
     train_batch = dl.load_full_batch("train")
     test_batch = dl.load_full_batch("test")
     dev_batch = dl.load_full_batch("dev")
-#    print(train_batch["green"])
-    print(test_batch["purple"])
+    print(len(train_batch["green"]))
+#    print(test_batch["purple"])
     #print(dev_batch["blue"])
 
 
