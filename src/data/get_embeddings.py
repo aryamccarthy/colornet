@@ -1,6 +1,7 @@
 import itertools
 import numpy
 import gensim
+from pathlib import Path
 import pickle
 import os
 import sys
@@ -8,7 +9,7 @@ import sys
 # input paths
 MODEL_PATH = "/Users/ryanculkin/Downloads/GoogleNews-vectors-negative300.bin"
 OUT_PATH = "/Users/ryanculkin/Desktop/dl/proj/subset.p"
-CLR_DIR = "/Users/ryanculkin/Desktop/dl/proj/comparative_colors"
+CLR_DIR = Path("../../data/raw")
 QUANT_PATH = '%s/quantifiers.txt' % (CLR_DIR)
 CMP_PATH = '%s/comparatives.txt'  % (CLR_DIR)
 
