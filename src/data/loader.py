@@ -78,7 +78,7 @@ class DataLoader:
         for ref in self.refs:
             if ref in SUBSET:
                 for space_str, filename in self.color_lines:
-                    if ref in filename and filename != ref:
+                    if ref == space_str.split(" ")[-1] and ref != filename:
                         refs_to_colors[ref].append((space_str, filename))
         color_to_avgs = self.get_avgs([x[1] for x in self.color_lines], split)
         # dict to return:
