@@ -5,7 +5,10 @@ from torch.utils import data
 
 
 class ColorDataset(data.Dataset):
-    """Characterizes a dataset for PyTorch"""
+    """Characterizes a dataset for PyTorch
+
+    Modeled after https://stanford.edu/~shervine/blog/pytorch-how-to-generate-data-parallel
+    """
     DATA_PATH = Path("../../data/processed")
 
     def __init__(self, split: str):

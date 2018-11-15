@@ -145,8 +145,8 @@ def write(loader: DataLoader, split: str):
     complete_instances = [i for i in instances if len(i["target"]) and len(i["reference"])]
 
     for i, inst in enumerate(complete_instances):
-        inst["target"] = torch.from_numpy(inst["target"])
-        inst["reference"] = torch.from_numpy(inst["reference"])
+        inst["target"] = torch.from_numpy(inst["target"]).float()
+        inst["reference"] = torch.from_numpy(inst["reference"]).float()
         torch.save(inst, WRITE_DESTINATION / f"{split}{i}.pt")
 
 if __name__ == "__main__":
