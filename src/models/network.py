@@ -17,7 +17,7 @@ def euclidean_distance(a: th.Tensor, b: th.Tensor):
 
 class ColorNet(nn.Module):
     """docstring for ColorNet"""
-    def __init__(self, color_dim, embedding_dim, embedding_file):
+    def __init__(self, color_dim, embedding_dim, embedding_file, beta: float=1.0):
         super().__init__()
         self.color_dim = color_dim
         self.embedding_dim = embedding_dim
@@ -29,6 +29,7 @@ class ColorNet(nn.Module):
 
         self.loss1 = nn.CosineSimilarity(dim=0)
         self.loss2 = euclidean_distance
+        self.beta = beta
 
     def forward_for_one_item(self, instance: Dict) -> Dict:
         output = {}
@@ -61,7 +62,7 @@ class ColorNet(nn.Module):
         loss2 = self.loss2(reference + pred, target)
         output["distance"] = loss2
 
-        output["loss"] = loss1 + loss2
+        output["loss"] = loss1 + self.beta * loss2
 
         return output
 
