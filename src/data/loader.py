@@ -3,9 +3,21 @@ import os
 import re
 import numpy as np
 import csv
+from pathlib import Path
+from pprint import pprint
 import pickle
 import sys
+from typing import Dict, List
 
+import torch
+
+WRITE_DESTINATION = Path("../../data/processed")
+
+# get current estimate of subset
+PRED_FILE = Path(__file__).parent / "predcolor.txt"
+with open(PRED_FILE) as f1:
+    SUBSET = [x.strip() for x in f1.readlines()]
+#SUBSET = ["blue", "green", "yellow", "red", "gray", "orange", "purple"]
 class DataLoader:
     def __init__(self, raw_dir, file_dir):
         self.raw_dir = raw_dir
@@ -60,13 +72,13 @@ class DataLoader:
 
 
     def load_full_batch(self, split="train"):
+        assert split in {"train", "dev", "test"}
         # subset these for now
-        SUBSET = ["blue", "green", "yellow", "red", "gray", "orange", "purple"]
         refs_to_colors = defaultdict(list)
         for ref in self.refs:
             if ref in SUBSET:
                 for space_str, filename in self.color_lines:
-                    if ref in filename and filename != ref:
+                    if ref == space_str.split(" ")[-1] and ref != filename:
                         refs_to_colors[ref].append((space_str, filename))
         color_to_avgs = self.get_avgs([x[1] for x in self.color_lines], split)
         # dict to return:
@@ -125,13 +137,33 @@ def read_csv(path, delimiter = ","):
         return [x for x in csvreader]
 
 
+def write(loader: DataLoader, split: str):
+    assert split in {"train", "test", "dev"}
+
+    full_batch = dl.load_full_batch(split)
+    instances = [instance for key in full_batch for instance in full_batch[key]]
+    complete_instances = [i for i in instances if len(i["target"]) and len(i["reference"])]
+
+    for i, inst in enumerate(complete_instances):
+        inst["target"] = torch.from_numpy(inst["target"]).float()
+        inst["reference"] = torch.from_numpy(inst["reference"]).float()
+        torch.save(inst, WRITE_DESTINATION / f"{split}{i}.pt")
+
 if __name__ == "__main__":
     dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/")
+
+    # Check that we can do things right.
     train_batch = dl.load_full_batch("train")
-    test_batch = dl.load_full_batch("test")
-    dev_batch = dl.load_full_batch("dev")
-#    print(train_batch["green"])
-    print(test_batch["purple"])
-    #print(dev_batch["blue"])
+    for key in train_batch:
+        for instance in train_batch[key]:
+            pprint(instance)
+    print(len(train_batch["green"]))
 
+    # Delete files.
+    for file in WRITE_DESTINATION.glob("*.pt"):
+        file.unlink()  # Equivalent to `rm`
 
+    # Write new ones.
+    write(dl, "train")
+    write(dl, "dev")
+    write(dl, "test")

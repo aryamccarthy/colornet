@@ -1,5 +1,5 @@
 import io
-from typing import List
+from typing import Dict, List
 
 import torch as th
 from torch import nn
@@ -30,7 +30,7 @@ class ColorNet(nn.Module):
         self.loss1 = nn.CosineSimilarity(dim=0)
         self.loss2 = euclidean_distance
 
-    def forward(self, instance: dict) -> dict:
+    def forward_for_one_item(self, instance: Dict) -> Dict:
         output = {}
         # Shape: (COLOR_DIM, )
         reference: th.Tensor = instance["reference"]
@@ -39,6 +39,9 @@ class ColorNet(nn.Module):
         assert len(adjective) in {1, 2}
         if len(adjective) == 1:
             adjective.insert(0, "<PAD>")
+
+        adjective = ["<PAD>", "<PAD>"]  # HACK!!! Ignores words completely.
+
         # Tensors are each of shape (EMBEDDING_DIM, )
         word_vectors: List[th.Tensor] = [self.lookup_vector(x) for x in adjective]
 
@@ -61,6 +64,10 @@ class ColorNet(nn.Module):
         output["loss"] = loss1 + loss2
 
         return output
+
+    def forward(self, instances: List[Dict]) -> Dict:
+        outputs: List[Dict] = [self.forward_for_one_item(instance) for instance in instances]
+        return outputs
 
     # Return shape: (EMBEDDING_DIM, )
     def lookup_vector(self, target_word: str) -> th.Tensor:
@@ -91,4 +98,4 @@ if __name__ == '__main__':
         "comparative": "lighter",
         "target": th.Tensor([114, 191, 220])
     }
-    print(net(data1))
+    print(net([data1]))

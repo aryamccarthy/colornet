@@ -1,6 +1,7 @@
 import itertools
 import numpy
 import gensim
+from pathlib import Path
 import pickle
 import os
 import sys
