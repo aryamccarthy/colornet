@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from network import ColorNet
 from data.dataset import ColorDataset
+from data.embeddings import load_embeddings
 
 def collate(batch):
     return batch
@@ -63,8 +64,10 @@ def run(
         log_dir: Path,
         embedding_file: Path,
         ) -> None:
+    embeddings = load_embeddings(embedding_file)
+
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size)
-    model = ColorNet(color_dim=3, embedding_dim=300, embedding_file=embedding_file)
+    model = ColorNet(color_dim=3, embeddings=embeddings)
 
     optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
     trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch)
@@ -129,7 +132,7 @@ def parse_args() -> argparse.Namespace:
                         help='how many batches to wait before logging training status')
     parser.add_argument("--log_dir", type=Path, default="../../models/tensorboard_logs",
                         help="log directory for Tensorboard log output")
-    parser.add_argument("--embedding_file", type=Path, default="../../data/external/wiki-news-300d-1M-subword.vec",
+    parser.add_argument("--embedding_file", type=Path, default="../../data/embeddings/subset-wb.p",
                         help="Where the embeddings are stored")
 
     args = parser.parse_args()
