@@ -21,7 +21,7 @@ class ColorNet(nn.Module):
     def __init__(self,
             color_dim,
             embeddings: Dict[str, np.ndarray],
-            beta: float=0.3/0.7) -> None:
+            beta: float=0.01) -> None:
         super().__init__()
         self.color_dim = color_dim
 
@@ -45,8 +45,6 @@ class ColorNet(nn.Module):
         assert len(adjective) in {1, 2}
         if len(adjective) == 1:
             adjective.insert(0, "<PAD>")
-
-        # adjective = ["<PAD>", "<PAD>"]  # HACK!!! Ignores words completely.
 
         # Tensors are each of shape (EMBEDDING_DIM, )
         word_vectors: List[th.Tensor] = [self.lookup_vector(x) for x in adjective]
@@ -80,21 +78,8 @@ class ColorNet(nn.Module):
         try:
             return self.embeddings[target_word]
         except KeyError:
+            # print("Couldn't find {}".format(target_word))
             return ZERO_VECTOR
-        # fname = self.embedding_file
-        # fin = io.open(fname, 'r', encoding='utf-8', newline='\n', errors='ignore')
-        # n, d = map(int, fin.readline().split())
-        # data = {}
-        # if target_word == "<PAD>":
-        #     return ZERO_VECTOR
-        # for line in tqdm.tqdm(fin, total=999995):
-        #     tokens = line.rstrip().split(' ')
-        #     # data[tokens[0]] = map(float, tokens[1:])
-        #     if tokens[0] == target_word:
-        #         return th.Tensor(list(map(float, tokens[1:])))
-        # else:
-        #     raise KeyError
-
 
 
 if __name__ == '__main__':

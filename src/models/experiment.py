@@ -8,14 +8,27 @@ from typing import Dict, List
 
 from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
 from ignite.metrics import Accuracy, Loss
+from tensorboardX import SummaryWriter
 import torch
-from torch.optim import SGD
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from network import ColorNet
 from data.dataset import ColorDataset
 from data.embeddings import load_embeddings
+
+
+def create_summary_writer(model, data_loader, log_dir):
+    writer = SummaryWriter(log_dir=log_dir)
+    data_loader_iter = iter(data_loader)
+    x = next(data_loader_iter)
+    try:
+        writer.add_graph(model, x)
+    except Exception as e:
+        print("Failed to save model graph: {}".format(e))
+    return writer
+
 
 def collate(batch):
     return batch
@@ -68,8 +81,9 @@ def run(
 
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size)
     model = ColorNet(color_dim=3, embeddings=embeddings)
+    writer = create_summary_writer(model, train_loader, log_dir)
 
-    optimizer = SGD(model.parameters(), lr=lr, momentum=momentum)
+    optimizer = Adam(model.parameters(), lr=lr, momentum=momentum)
     trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch)
     evaluator = create_supervised_evaluator(model, prepare_batch=prepare_batch,
                                             metrics={'loss': Loss(loss_fn),
@@ -90,6 +104,7 @@ def run(
         if iter % log_interval == 0:
             pbar.desc = desc.format(engine.state.output)
             pbar.update(log_interval)
+        writer.add_scalar("training/loss", engine.state.output, engine.state.iteration)
 
     def log_results(engine, loader: DataLoader, split: str) -> None:
         evaluator.run(loader)
@@ -101,6 +116,10 @@ def run(
             "{} Results - Epoch: {}  Avg loss: {:.2f} Avg angle: {:.2f} Avg distance: {:.2f}"
             .format(split, engine.state.epoch, avg_loss, avg_angle, avg_distance)
         )
+        writer.add_scalar(f"{split.lower()}/avg_loss", avg_loss, engine.state.epoch)
+        writer.add_scalar(f"{split.lower()}/avg_angle", avg_angle, engine.state.epoch)
+        writer.add_scalar(f"{split.lower()}/avg_distance", avg_distance, engine.state.epoch)
+
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_results(engine):
@@ -114,6 +133,7 @@ def run(
 
     trainer.run(train_loader, max_epochs=epochs)
     pbar.close()
+    writer.close()
 
 
 def parse_args() -> argparse.Namespace:
