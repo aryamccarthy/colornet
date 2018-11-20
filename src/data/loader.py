@@ -3,21 +3,22 @@ import os
 import re
 import numpy as np
 import csv
-from pathlib import Path
 from pprint import pprint
 import pickle
 import sys
 from typing import Dict, List
 
-import torch
+#import torch
 
 WRITE_DESTINATION = Path("../../data/processed")
 
 # get current estimate of subset
 PRED_FILE = Path(__file__).parent / "predcolor.txt"
+#PRED_FILE = "predcolor.txt"
 with open(PRED_FILE) as f1:
     SUBSET = [x.strip() for x in f1.readlines()]
 #SUBSET = ["blue", "green", "yellow", "red", "gray", "orange", "purple"]
+#SUBSET = ["navy"]
 class DataLoader:
     def __init__(self, raw_dir, file_dir):
         self.raw_dir = raw_dir
@@ -78,7 +79,7 @@ class DataLoader:
         for ref in self.refs:
             if ref in SUBSET:
                 for space_str, filename in self.color_lines:
-                    if ref in filename and filename != ref:
+                    if ref == space_str.split(" ")[-1] and ref != filename:
                         refs_to_colors[ref].append((space_str, filename))
         color_to_avgs = self.get_avgs([x[1] for x in self.color_lines], split)
         # dict to return:
@@ -92,6 +93,9 @@ class DataLoader:
                     comparative_name = self.get_comp_name(space_str)
                     if comparative_name is not None:
                         color_avg = color_to_avgs[color]
+                        if len(color_avg) == 0:
+                            print(ref, split, comparative_name,  color)
+                            sys.exit()
                         ref_dict = {"reference": ref_avg, "comparative": comparative_name, "target": color_avg}
                         final_dict[ref].append(ref_dict)
         return final_dict
