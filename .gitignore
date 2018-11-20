@@ -106,4 +106,5 @@ venv.bak/
 # Our stuff
 *.vec
 data/processed/*.pt
-
+*.vec.pt
+models/tensorboard_logs
