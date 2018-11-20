@@ -1,13 +1,14 @@
 import itertools
 import numpy
 import gensim
+from pathlib import Path
 import pickle
 import os
 import sys
 
 # input paths
 MODEL_PATH = "/Users/ryanculkin/Downloads/GoogleNews-vectors-negative300.bin"
-OUT_PATH = "/Users/ryanculkin/Desktop/dl/proj/subset.p"
+OUT_PATH = "/Users/ryanculkin/Desktop/dl/proj/colornet/data/embeddings/subset-wb.p"
 CLR_DIR = "/Users/ryanculkin/Desktop/dl/proj/comparative_colors"
 QUANT_PATH = '%s/quantifiers.txt' % (CLR_DIR)
 CMP_PATH = '%s/comparatives.txt'  % (CLR_DIR)
@@ -28,7 +29,7 @@ def extract_words(path):
 if __name__ == '__main__':
 	if os.path.exists(OUT_PATH):
 		print ('file at %s exists... testing deserialization and then exiting' % (OUT_PATH))
-		with open(OUT_PATH, 'r') as in_f:
+		with open(OUT_PATH, 'rb') as in_f:
 			obj = pickle.load(in_f)
 		print ('success; exiting.')
 		sys.exit(0)
@@ -54,6 +55,6 @@ if __name__ == '__main__':
 	embedding_dict[PAD] = numpy.zeros(dimensionality)
 
 	# save the dictionary
-	with open(OUT_PATH, 'w') as out_f:
+	with open(OUT_PATH, 'wb') as out_f:
 		pickle.dump(embedding_dict, out_f)
 

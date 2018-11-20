@@ -1,6 +1,7 @@
 import io
-from typing import List
+from typing import Dict, List
 
+import numpy as np
 import torch as th
 from torch import nn
 
@@ -17,20 +18,25 @@ def euclidean_distance(a: th.Tensor, b: th.Tensor):
 
 class ColorNet(nn.Module):
     """docstring for ColorNet"""
-    def __init__(self, color_dim, embedding_dim, embedding_file):
+    def __init__(self,
+            color_dim,
+            embeddings: Dict[str, np.ndarray],
+            beta: float=0.01) -> None:
         super().__init__()
         self.color_dim = color_dim
-        self.embedding_dim = embedding_dim
-        self.embedding_file = embedding_file
 
-        self.fc1 = nn.Linear(EMBEDDING_DIM * 2 + COLOR_DIM, FC1_OUTPUT_SIZE)
+        self.embedding_dim = len(embeddings[next(iter(embeddings))])
+        self.embeddings = embeddings
+
+        self.fc1 = nn.Linear(self.embedding_dim * 2 + COLOR_DIM, FC1_OUTPUT_SIZE)
         self.fc2 = nn.Linear(FC1_OUTPUT_SIZE + 3, COLOR_DIM)
         self.nonlinearity = nn.ReLU()
 
         self.loss1 = nn.CosineSimilarity(dim=0)
         self.loss2 = euclidean_distance
+        self.beta = beta
 
-    def forward(self, instance: dict) -> dict:
+    def forward_for_one_item(self, instance: Dict) -> Dict:
         output = {}
         # Shape: (COLOR_DIM, )
         reference: th.Tensor = instance["reference"]
@@ -39,6 +45,7 @@ class ColorNet(nn.Module):
         assert len(adjective) in {1, 2}
         if len(adjective) == 1:
             adjective.insert(0, "<PAD>")
+
         # Tensors are each of shape (EMBEDDING_DIM, )
         word_vectors: List[th.Tensor] = [self.lookup_vector(x) for x in adjective]
 
@@ -58,37 +65,34 @@ class ColorNet(nn.Module):
         loss2 = self.loss2(reference + pred, target)
         output["distance"] = loss2
 
-        output["loss"] = loss1 + loss2
+        output["loss"] = loss1 + self.beta * loss2
 
         return output
 
+    def forward(self, instances: List[Dict]) -> Dict:
+        outputs: List[Dict] = [self.forward_for_one_item(instance) for instance in instances]
+        return outputs
+
     # Return shape: (EMBEDDING_DIM, )
     def lookup_vector(self, target_word: str) -> th.Tensor:
-        fname = self.embedding_file
-        fin = io.open(fname, 'r', encoding='utf-8', newline='\n', errors='ignore')
-        n, d = map(int, fin.readline().split())
-        data = {}
-        if target_word == "<PAD>":
+        try:
+            return self.embeddings[target_word]
+        except KeyError:
+            # print("Couldn't find {}".format(target_word))
             return ZERO_VECTOR
-        for line in tqdm.tqdm(fin, total=999995):
-            tokens = line.rstrip().split(' ')
-            # data[tokens[0]] = map(float, tokens[1:])
-            if tokens[0] == target_word:
-                return th.Tensor(list(map(float, tokens[1:])))
-        else:
-            raise KeyError
-
 
 
 if __name__ == '__main__':
+    import pickle
+    with open("../../data/embeddings/subset-wb.p", 'rb') as f:
+        embeddings = pickle.load(f)
     net = ColorNet(
         color_dim=3,
-        embedding_dim=300,
-        embedding_file="../../data/external/wiki-news-300d-1M-subword.vec"
+        embeddings=embeddings
     )
     data1 = {
         "reference": th.Tensor([80, 124, 192]),
         "comparative": "lighter",
         "target": th.Tensor([114, 191, 220])
     }
-    print(net(data1))
+    print(net([data1]))
