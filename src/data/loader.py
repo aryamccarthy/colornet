@@ -9,8 +9,19 @@ import sys
 from typing import Dict, List
 from data_maker import data_maker, clean_data_map
 import torch
+import tqdm
 from pathlib import Path
-import time 
+import time
+
+class Timer:    
+    def __enter__(self):
+        self.start = time.process_time()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.process_time()
+        self.interval = self.end - self.start
+
 
 WRITE_DESTINATION = Path("../../data/processed")
 
@@ -28,10 +39,9 @@ class DataLoader(object):
         data_map_subset = {k:v for k,v in self.data_map.items() if len(v) > 0}
         # data_map is {ref: [([comp], target}
         self.final_vocab = set(vocab)
-        t0 = time.time()
-        self.data = self.linearize_data(data_map_subset)
-        t1 = time.time()
-        print(f"linearization took {t1-t0}")
+        with Timer() as t:
+            self.data = self.linearize_data(data_map_subset)
+        print(f"linearization took {t.interval}")
 
     def __iter__(self):
         for i in range(0, len(self.data), self.batch_size):
@@ -52,7 +62,10 @@ class DataLoader(object):
                 # pad tokens 
                 batch_data.append({"reference": ref, "comparative": " ".join(comp_list), "target": target_average})
             t1 = time.time()
-            yield batch_data 
+            yield batch_data
+
+    def __len__(self):
+        return len(self.data) // self.batch_size
 
     def linearize_data(self, data_map):
         # linear form: (ref, comp, target)
@@ -108,15 +121,17 @@ def read_csv(path, delimiter = ","):
 #        f1.write("\n".join(vocab))
 
 if __name__ == "__main__":
+    print("Preparing training data...")
     train_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train")
+    print("Preparing test data...")
     test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test")
+    print("Preparing dev data...")
     dev_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev")
-    total_len = 0
-    t0 = time.time()
-    for batch in train_dl:
-        total_len += len(batch)
-    t1 = time.time()
+    
+    with Timer() as t:
+        total_len = sum(len(batch) for batch in tqdm.tqdm(train_dl, total=len(train_dl)))
+
     print(f"train data has {total_len} exemplars")
-    print(f"took {t1-t0} seconds")
+    print(f"took {t.interval} seconds")
 
 
