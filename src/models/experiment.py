@@ -98,13 +98,13 @@ def run(
 
     desc = "ITERATION - loss: {:.2f}"
     pbar = tqdm(
-        initial=0, leave=False, total=len(train_loader),
+        initial=0, leave=False, total=train_loader.length,
         desc=desc.format(0)
     )
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training_loss(engine):
-        iter = (engine.state.iteration - 1) % len(train_loader) + 1
+        iter = (engine.state.iteration - 1) % train_loader.length + 1
 
         if iter % log_interval == 0:
             pbar.desc = desc.format(engine.state.output)
