@@ -1,6 +1,7 @@
 """Because we believe in good scholarship.
 """
 import argparse
+from collections import Counter
 from pathlib import Path
 from pprint import pprint
 import sys; sys.path.append("..")
@@ -16,7 +17,7 @@ from tqdm import tqdm
 from data import DataLoader
 from network import ColorNet
 from data.dataset import ColorDataset
-from data.embeddings import load_embeddings
+from data.vocab import ExtensibleVocab
 
 
 def create_summary_writer(model, data_loader, log_dir):
@@ -74,15 +75,17 @@ def run(
         val_batch_size: int,
         epochs: int,
         lr: float,
-        momentum: float,
         log_interval: int,
         log_dir: Path,
-        embedding_file: Path,
+        vocab_file: Path,
+        beta: float
         ) -> None:
-    embeddings = load_embeddings(embedding_file)
+    words = "The quick brown fox jumps over the lazy dog".lower().split()
+    freqs = Counter(words)
+    vocab = ExtensibleVocab(freqs, vectors='fasttext.simple.300d')
 
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size)
-    model = ColorNet(color_dim=3, embeddings=embeddings)
+    model = ColorNet(color_dim=3, vocab=vocab, beta=beta)
     writer = create_summary_writer(model, train_loader, log_dir)
 
     optimizer = Adam(model.parameters(), lr=lr)
@@ -148,21 +151,21 @@ def parse_args() -> argparse.Namespace:
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--lr', type=float, default=0.01,
                         help='learning rate (default: 0.01)')
-    parser.add_argument('--momentum', type=float, default=0.5,
-                        help='SGD momentum (default: 0.5)')
     parser.add_argument('--log_interval', type=int, default=1,
                         help='how many batches to wait before logging training status')
     parser.add_argument("--log_dir", type=Path, default="../../models/tensorboard_logs",
                         help="log directory for Tensorboard log output")
     parser.add_argument("--embedding_file", type=Path, default="../../data/embeddings/subset-wb.p",
                         help="Where the embeddings are stored")
+    parser.add_argument("--beta", type=float, default=0.3/0.7,
+                        help="Weight between objectives: loss = (-cosine_sim) + β * distance")
 
     args = parser.parse_args()
     return args
 
 def main():
     args: argparse.Namespace = parse_args()
-    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.momentum, args.log_interval, args.log_dir, args.embedding_file)
+    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, args.embedding_file, args.beta)
 
 if __name__ == '__main__':
     main()
