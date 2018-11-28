@@ -7,7 +7,7 @@ from pprint import pprint
 import pickle
 import sys
 from typing import Dict, List
-from .data_maker import data_maker, clean_data_map
+from data_maker import data_maker, clean_data_map
 import torch
 import tqdm
 from pathlib import Path
@@ -40,7 +40,7 @@ class DataLoader(object):
         # data_map is {ref: [([comp], target}
         self.final_vocab = set(vocab)
         with Timer() as t:
-            self.data = self.linearize_data(data_map_subset)
+            self.data = self.linearize_data(data_map_subset, split)
         # one-time thing: 
         if write_vocab:
             # get all the data
@@ -56,7 +56,7 @@ class DataLoader(object):
                 comp_str = data_tup[1]
                 comp_words = comp_str.split(" ")
                 vocab |= set(comp_words)
-            vocab |= {"<PAD>", "<pad>", "more"}
+            vocab |= {"<PAD>", "<pad>", "more", "less"}
             # add the comparatives
             with open(self.comp_file) as f1, open(self.quant_file) as f2:
                 comp_lines = f1.readlines()
@@ -173,7 +173,7 @@ def read_csv(path, delimiter = ","):
 
 if __name__ == "__main__":
     print("Preparing training data...")
-    train_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train")
+    train_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train", write_vocab=True)
     print(train_dl.length)
     test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test")
     print(test_dl.length)
