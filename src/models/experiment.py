@@ -11,9 +11,9 @@ from ignite.metrics import Accuracy, Loss
 from tensorboardX import SummaryWriter
 import torch
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+#from torch.utils.data import DataLoader
 from tqdm import tqdm
-
+from data import DataLoader
 from network import ColorNet
 from data.dataset import ColorDataset
 from data.embeddings import load_embeddings
@@ -34,11 +34,13 @@ def collate(batch):
     return batch
 
 def get_data_loaders(train_batch_size: int, val_batch_size: int):
-    training_dataset = ColorDataset("train")
-    training_generator = DataLoader(training_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=collate)
+ #   training_dataset = ColorDataset("train")
+#    training_generator = DataLoader(training_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=collate)
 
-    dev_dataset = ColorDataset("dev")
-    dev_generator = DataLoader(dev_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=collate)
+    training_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train")
+    dev_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev")
+    #dev_dataset = ColorDataset("dev")
+ #   dev_generator = DataLoader(dev_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=collate)
 
     return training_generator, dev_generator
 
@@ -83,7 +85,7 @@ def run(
     model = ColorNet(color_dim=3, embeddings=embeddings)
     writer = create_summary_writer(model, train_loader, log_dir)
 
-    optimizer = Adam(model.parameters(), lr=lr, momentum=momentum)
+    optimizer = Adam(model.parameters(), lr=lr)
     trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch)
     evaluator = create_supervised_evaluator(model, prepare_batch=prepare_batch,
                                             metrics={'loss': Loss(loss_fn),

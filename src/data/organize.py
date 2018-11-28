@@ -67,7 +67,7 @@ def get_refs_from_file(color_path, quant_path, comp_path):
     filtered_by_adj = set(filtered_by_adj)
     print("there are {} after quant/comp filtering".format(len(filtered_by_adj)))
     with open("predcolor.txt","w") as f1:
-        f1.write("\n".join(filtered_by_adj))
+        f1.write("\n".join(sorted(filtered_by_adj)))
     return filtered_by_adj
 #def get_refs_from_file(color_path, quant_path, comp_path):
 #    all_refs = []

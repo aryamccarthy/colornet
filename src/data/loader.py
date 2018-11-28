@@ -7,7 +7,7 @@ from pprint import pprint
 import pickle
 import sys
 from typing import Dict, List
-from data_maker import data_maker, clean_data_map
+from .data_maker import data_maker, clean_data_map
 import torch
 from pathlib import Path
 import time 
@@ -32,7 +32,8 @@ class DataLoader(object):
         self.data = self.linearize_data(data_map_subset)
         t1 = time.time()
         print(f"linearization took {t1-t0}")
-
+        self.length = int(len(self.data)/batch_size) + 1
+            
     def __iter__(self):
         for i in range(0, len(self.data), self.batch_size):
             t0 = time.time()
@@ -109,11 +110,16 @@ def read_csv(path, delimiter = ","):
 
 if __name__ == "__main__":
     train_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train")
+    print(train_dl.length)
     test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test")
+    print(test_dl.length)
     dev_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev")
+    print(dev_dl.length)
     total_len = 0
     t0 = time.time()
-    for batch in train_dl:
+#    for batch in train_dl:
+        #total_len += len(batch)
+    for batch in dev_dl:
         total_len += len(batch)
     t1 = time.time()
     print(f"train data has {total_len} exemplars")
