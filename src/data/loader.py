@@ -9,8 +9,19 @@ import sys
 from typing import Dict, List
 from .data_maker import data_maker, clean_data_map
 import torch
+import tqdm
 from pathlib import Path
-import time 
+import time
+
+class Timer:    
+    def __enter__(self):
+        self.start = time.process_time()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.process_time()
+        self.interval = self.end - self.start
+
 
 WRITE_DESTINATION = Path("../../data/processed")
 
@@ -28,8 +39,8 @@ class DataLoader(object):
         data_map_subset = {k:v for k,v in self.data_map.items() if len(v) > 0}
         # data_map is {ref: [([comp], target}
         self.final_vocab = set(vocab)
-        t0 = time.time()
-        self.data = self.linearize_data(data_map_subset, self.split)
+        with Timer() as t:
+            self.data = self.linearize_data(data_map_subset)
         # one-time thing: 
         if write_vocab:
             # get all the data
@@ -68,14 +79,11 @@ class DataLoader(object):
             with open("../../data/embeddings/str_to_ids.pkl", "rb") as f1, open("../../data/embeddings/ids_to_str.pkl", "rb") as f2:
                 self.str_to_ids = pickle.load(f1)
                 self.ids_to_str = pickle.load(f2)
-
-        t1 = time.time()
-        print(f"linearization took {t1-t0}")
         self.length = int(len(self.data)/batch_size) + 1
             
+        print(f"linearization took {t.interval}")
     def __iter__(self):
         for i in range(0, len(self.data), self.batch_size):
-            t0 = time.time()
             batch_data = []
             ref_data = []
             comp_data = []
@@ -100,10 +108,12 @@ class DataLoader(object):
                 comp_data.append(comp_str_as_ints)
 
                 #batch_data.append({"reference": torch.FloatTensor(ref), "comparative": " ".join(comp_list), "target": torch.FloatTensor(target_average)})
-            t1 = time.time()
             # convert to tensor arrays
             as_tensor = (torch.FloatTensor(ref_data), torch.LongTensor(comp_data), torch.FloatTensor(target_data))
             yield batch_data 
+
+    def __len__(self):
+        return len(self.data) // self.batch_size
 
     def convert_to_ids(self, comp_list):
         return [self.str_to_ids[x] for x in comp_list] 
@@ -162,6 +172,7 @@ def read_csv(path, delimiter = ","):
 #        f1.write("\n".join(vocab))
 
 if __name__ == "__main__":
+    print("Preparing training data...")
     train_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train")
     print(train_dl.length)
     test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test")
@@ -169,13 +180,11 @@ if __name__ == "__main__":
     dev_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev")
     print(dev_dl.length)
     total_len = 0
-    t0 = time.time()
-#    for batch in train_dl:
-        #total_len += len(batch)
-    for batch in dev_dl:
-        total_len += len(batch)
-    t1 = time.time()
+    
+    with Timer() as t:
+        total_len = sum(len(batch) for batch in tqdm.tqdm(train_dl, total=len(train_dl)))
+
     print(f"train data has {total_len} exemplars")
-    print(f"took {t1-t0} seconds")
+    print(f"took {t.interval} seconds")
 
 
