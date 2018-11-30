@@ -7,7 +7,7 @@ from pprint import pprint
 import pickle
 import sys
 from typing import Dict, List
-from data_maker import data_maker, clean_data_map
+from .data_maker import data_maker, clean_data_map
 import torch
 import tqdm
 from pathlib import Path
@@ -69,10 +69,11 @@ class DataLoader(object):
             for i, word in enumerate(sorted_vocab):
                 str_to_ids[word] = i
                 ids_to_str[i] = word
-            with open("../../data/embeddings/str_to_ids.pkl", "wb") as f1:
+
+            with open("../../data/embeddings/str_to_ids.pkl", "wb") as f1, open("../../data/embeddings/ids_to_str.pkl", "wb") as f2:
                 pickle.dump(str_to_ids, f1)
-            with open("../../data/embeddings/ids_to_str.pkl", "wb") as f2:
                 pickle.dump(ids_to_str, f2)
+
             self.str_to_ids = str_to_ids
             self.ids_to_str = ids_to_str
         else:
@@ -92,7 +93,6 @@ class DataLoader(object):
                 batch_tups = self.data[i:i + self.batch_size]
             except IndexError:
                 batch_tups = self.data[i:]
-            
             for j in range(len(batch_tups)):
                 ref, comp, target = batch_tups[j]
                 target_average = self.get_avgs(target, self.split)
@@ -110,7 +110,7 @@ class DataLoader(object):
                 #batch_data.append({"reference": torch.FloatTensor(ref), "comparative": " ".join(comp_list), "target": torch.FloatTensor(target_average)})
             # convert to tensor arrays
             as_tensor = (torch.FloatTensor(ref_data), torch.LongTensor(comp_data), torch.FloatTensor(target_data))
-            yield batch_data 
+            yield as_tensor
 
     def __len__(self):
         return len(self.data) // self.batch_size
@@ -156,20 +156,6 @@ def read_csv(path, delimiter = ","):
         return [x for x in csvreader]
 
 
-#def write(loader: DataLoader, split: str):
-#    assert split in {"train", "test", "dev"}
-#
-#    full_batch, vocab = dl.load_split(split)
-#    instances = [instance for key in full_batch for instance in full_batch[key]]
-#    complete_instances = [i for i in instances if len(i["target"]) and len(i["reference"])]
-#
-#    for i, inst in enumerate(complete_instances):
-#        inst["target"] = torch.from_numpy(inst["target"]).float()
-#        inst["reference"] = torch.from_numpy(inst["reference"]).float()
-#        torch.save(inst, WRITE_DESTINATION / f"{split}{i}.pt")
-#
-#    with open("../../data/embeddings/{}_vocab.txt".format(split), "w") as f1:
-#        f1.write("\n".join(vocab))
 
 if __name__ == "__main__":
     print("Preparing training data...")

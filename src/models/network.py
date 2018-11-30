@@ -1,86 +1,66 @@
 import io
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch as th
 from torch import nn
 from torchtext.vocab import Vocab, Vectors
 
+import pickle
 import tqdm
 
 COLOR_DIM = 3
 FC1_OUTPUT_SIZE = 30
 
-def euclidean_distance(a: th.Tensor, b: th.Tensor):
-    assert len(a) == len(b)
-    return th.sqrt(th.sum((a - b) ** 2))
 
 class ColorNet(nn.Module):
     """docstring for ColorNet"""
     def __init__(self,
             color_dim,
-            vocab: Vocab,
-            beta: float=0.01) -> None:
+            vocab: dict,
+            pretrained_embeddings: np.array = None,
+            beta: float=0.01,
+            trainable_embeddings: bool = False) -> None:
         super().__init__()
+    
         self.color_dim = color_dim
-
         self.vocab = vocab
-        self.embedding_dim = len(vocab["<PAD>"])
-
+        # embedding layer
+        try:
+            assert(pretrained_embeddings.shape[0] == len(self.vocab))
+        except AssertionError:
+            #raise AssertionError(f"trained embeddings and vocab do not match: {pretrained_embeddings.shape[0]}, {len(self.vocab}")
+            raise AssertionError("trained embeddings and vocab do not match: {}, {}".format(pretrained_embeddings.shape[0], len(self.vocab)))
+            
+        #self.embedding_dim = len(vocab["<PAD>"])
+        self.embedding_dim = pretrained_embeddings.shape[1]
+        
+        self.embedding = nn.Embedding(len(self.vocab), self.embedding_dim)
+        # load in pre-trained weights
+        self.embedding.weight.data.copy_(th.from_numpy(pretrained_embeddings)) 
+        if not trainable_embeddings:
+           self.embedding.requires_grad = False 
         self.fc1 = nn.Linear(self.embedding_dim * 2 + COLOR_DIM, FC1_OUTPUT_SIZE)
         self.fc2 = nn.Linear(FC1_OUTPUT_SIZE + 3, COLOR_DIM)
         self.nonlinearity = nn.ReLU()
 
-        self.metric1 = nn.CosineSimilarity(dim=0)
-        self.metric2 = euclidean_distance
         self.beta = beta
-
-    def forward_for_one_item(self, instance: Dict) -> Dict:
+    
+    def forward(self, instance: Tuple) -> Dict:
         output = {}
-        # Shape: (COLOR_DIM, )
-        reference: th.Tensor = instance["reference"]
-        comparative: str = instance["comparative"]
-        adjective: List[str] = comparative.split()
-        # Output is of shape (2 * EMBEDDING_DIM, )
-        word_vectors: th.Tensor = self.lookup_vector(adjective)
-
-        # Shape: (2 * EMBEDDING_DIM + COLOR_DIM, )
-        inputs = th.cat([word_vectors, reference])
-        # Shape: (FC1_OUTPUT_SIZE, )
+        reference = instance[0]
+        comparative_as_ints = instance[1]
+        comparative_as_embedding = self.embedding(comparative_as_ints)
+        comparative_as_embedding = comparative_as_embedding.reshape((-1, comparative_as_embedding.size()[1] * comparative_as_embedding.size()[2]))
+        
+        inputs = th.cat([comparative_as_embedding, reference], dim=1)
         x = self.fc1(inputs)
-        # Shape: (FC1_OUTPUT_SIZE, )
         x = self.nonlinearity(x)
-        # Shape: (COLOR_DIM, )
-        pred = self.fc2(th.cat([x, reference]))  # Pass the reference into the second layer, too.
+        pred = self.fc2(th.cat([x, reference], dim=1))
 
-        output["pred"] = pred
-        target = instance["target"]
-        output["cosine_sim"] = self.metric1(pred, target - reference)
-        output["distance"] = self.metric2(reference + pred, target)
-        loss1, loss2 = -output["cosine_sim"], output["distance"]
-
-        output["loss"] = loss1 + self.beta * loss2
-
-        return output
-
-    def forward(self, instances: List[Dict]) -> Dict:
-        outputs: List[Dict] = [self.forward_for_one_item(instance) for instance in instances]
-        return outputs
-
-    # Return shape: (EMBEDDING_DIM, )
-    def lookup_vector(self, target_words: List[str]) -> th.Tensor:
-        assert len(target_words) in {1, 2}
-        if len(target_words) == 1:
-            target_words.insert(0, "<pad>")
-        assert len(target_words) == 2
-        # Tensors are of shape (EMBEDDING_DIM, )
-        word_vectors = [self.vocab[word] for word in target_words]
-        combined = th.cat(word_vectors)
-        return combined
-
+        return pred, reference, self.beta
 
 if __name__ == '__main__':
-    import pickle
     with open("../../data/embeddings/subset-wb.p", 'rb') as f:
         embeddings = pickle.load(f)
     vocab = {x: th.FloatTensor(y) for x, y in embeddings.items()}

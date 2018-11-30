@@ -6,19 +6,26 @@ from pathlib import Path
 from pprint import pprint
 import sys; sys.path.append("..")
 from typing import Dict, List
+import pickle 
 
+from typing import Dict, List, Tuple
 from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
 from ignite.metrics import Accuracy, Loss
+from ignite.handlers import ModelCheckpoint
 from tensorboardX import SummaryWriter
-import torch
+import torch as th
+from torch import nn
 from torch.optim import Adam
-#from torch.utils.data import DataLoader
 from tqdm import tqdm
 from data import DataLoader
 from network import ColorNet
 from data.dataset import ColorDataset
 from data.vocab import ExtensibleVocab
+import numpy as np
 
+def euclidean_distance(a: th.Tensor, b: th.Tensor):
+    assert len(a) == len(b)
+    return th.sqrt(th.sum((a - b) ** 2))
 
 def create_summary_writer(model, data_loader, log_dir):
     writer = SummaryWriter(log_dir=log_dir)
@@ -51,17 +58,24 @@ def prepare_batch(batch, device=None, non_blocking=False):
     `ignite` expects (x, y) pairs, but our network takes in dicts and 
     returns dicts as well. We create a useless `y` just to satisfy the API.
     """
-    x = batch
-    y = torch.Tensor([0.0 for _ in batch])
+    x = batch[0:-1]
+    y = batch[-1]    
     return x, y
 
-def loss_fn(y_pred: List[Dict], y: None):
+def loss_fn(y_pred: Tuple[th.Tensor], y: th.Tensor):
     """Jump through hoops to work with `ignite`.
 
     We ignore `y` (as with `prepare_batch`) and return only the relevant
     dictionary entry of `y_pred`. 
     """
-    total_loss = sum(output["loss"] for output in y_pred) / len(y_pred)
+    pred, reference, beta = y_pred
+    cosine_fn = nn.CosineSimilarity(dim=0) 
+    cosine_sim = cosine_fn(pred, y- reference) 
+    euc_dist = euclidean_distance(reference + pred, y)
+    loss1, loss2 = -cosine_sim, euc_dist
+  
+    agg_loss = loss1 + beta * loss2
+    total_loss = th.mean(agg_loss, dim=0)
     return total_loss
 
 def distance(y_pred: List[Dict], y: None):
@@ -77,19 +91,49 @@ def run(
         lr: float,
         log_interval: int,
         log_dir: Path,
-        vocab_file: Path,
+        str_to_ids: Path,
+        ids_to_str: Path,
         beta: float
         ) -> None:
-    words = "The quick brown fox jumps over the lazy dog".lower().split()
+    # init checkpointing 
+    model_dir = os.path.join(log_dir, "models")
+    try:
+        os.mkdir(model_dir)
+    except FileExistsError:
+        pass
+     
+    handler = ModelCheckpoint(model_dir, prefix=f"{lr}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True)
+
+    # load vocab from pickled dict
+    with open(str_to_ids, "rb") as f1, open(ids_to_str, "rb") as f2:
+        str_to_ids = pickle.load(f1)
+        ids_to_str = pickle.load(f2)
+    # get the corresponding vectors, sorted by vocab index
+    words = str_to_ids.keys() 
     freqs = Counter(words)
     vocab = ExtensibleVocab(freqs, vectors='fasttext.simple.300d')
-
+    sorted_vocab_items = sorted(str_to_ids.items(), key=lambda x: x[1])
+    num_embeddings, embedding_dim = len(words), list(vocab["<PAD>"].size())[0]
+    # init empty array for embeddings
+    print(num_embeddings, embedding_dim)
+    embedding_arr = np.zeros((num_embeddings, embedding_dim))
+    
+    # fill the array in order
+    for word, idx in sorted_vocab_items:
+        corresponding_embedding = vocab[word]
+        embedding_arr[idx,:] = corresponding_embedding 
+    print("Getting train/dev loaders...")
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size)
-    model = ColorNet(color_dim=3, vocab=vocab, beta=beta)
+    print("Got loaders")
+    print("Defining model...")
+    model = ColorNet(color_dim=3, vocab=str_to_ids, pretrained_embeddings = embedding_arr, beta=beta)
+    print("Defined model")
     writer = create_summary_writer(model, train_loader, log_dir)
 
     optimizer = Adam(model.parameters(), lr=lr)
     trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch)
+    # add checkpointing 
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
     evaluator = create_supervised_evaluator(model, prepare_batch=prepare_batch,
                                             metrics={'loss': Loss(loss_fn),
                                             'angle': Loss(angle),
@@ -136,6 +180,11 @@ def run(
         log_results(engine, val_loader, "Validation")
         pbar.n = pbar.last_print_n = 0
 
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def save_model(engine):
+        
+
+
     trainer.run(train_loader, max_epochs=epochs)
     pbar.close()
     writer.close()
@@ -165,7 +214,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args: argparse.Namespace = parse_args()
-    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, args.embedding_file, args.beta)
+    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, "../../data/embeddings/str_to_ids.pkl", "../../data/embeddings/ids_to_str.pkl", args.beta)
 
 if __name__ == '__main__':
     main()
