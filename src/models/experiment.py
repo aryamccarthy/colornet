@@ -7,6 +7,8 @@ from pprint import pprint
 import sys; sys.path.append("..")
 from typing import Dict, List
 import pickle 
+import subprocess
+import os
 
 from typing import Dict, List, Tuple
 from ignite.engine import Events, create_supervised_trainer, create_supervised_evaluator
@@ -41,12 +43,12 @@ def create_summary_writer(model, data_loader, log_dir):
 def collate(batch):
     return batch
 
-def get_data_loaders(train_batch_size: int, val_batch_size: int):
+def get_data_loaders(train_batch_size: int, val_batch_size: int, device: int = None):
  #   training_dataset = ColorDataset("train")
 #    training_generator = DataLoader(training_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=collate)
 
-    training_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train")
-    dev_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev")
+    training_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train", device=device)
+    dev_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev", device=device)
     #dev_dataset = ColorDataset("dev")
  #   dev_generator = DataLoader(dev_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=collate)
 
@@ -93,8 +95,12 @@ def run(
         log_dir: Path,
         str_to_ids: Path,
         ids_to_str: Path,
-        beta: float
+        beta: float,
+        device: int = None
         ) -> None:
+    if device is not None:
+        device = torch.device(device)
+    
     # init checkpointing 
     model_dir = os.path.join(log_dir, "models")
     try:
@@ -102,8 +108,6 @@ def run(
     except FileExistsError:
         pass
      
-    handler = ModelCheckpoint(model_dir, prefix=f"{lr}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True)
-
     # load vocab from pickled dict
     with open(str_to_ids, "rb") as f1, open(ids_to_str, "rb") as f2:
         str_to_ids = pickle.load(f1)
@@ -123,18 +127,19 @@ def run(
         corresponding_embedding = vocab[word]
         embedding_arr[idx,:] = corresponding_embedding 
     print("Getting train/dev loaders...")
-    train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size)
+    train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size, device=device)
     print("Got loaders")
     print("Defining model...")
-    model = ColorNet(color_dim=3, vocab=str_to_ids, pretrained_embeddings = embedding_arr, beta=beta)
+    model = ColorNet(color_dim=3, vocab=str_to_ids, pretrained_embeddings = embedding_arr, beta=beta, device=device)
     print("Defined model")
     writer = create_summary_writer(model, train_loader, log_dir)
 
+    handler = ModelCheckpoint(model_dir, f"{lr}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True,)
     optimizer = Adam(model.parameters(), lr=lr)
-    trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch)
+    trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch, device=device)
     # add checkpointing 
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, handler)
-    evaluator = create_supervised_evaluator(model, prepare_batch=prepare_batch,
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, handler,  {"mymodel": model })
+    evaluator = create_supervised_evaluator(model, prepare_batch=prepare_batch, device=device,
                                             metrics={'loss': Loss(loss_fn),
                                             'angle': Loss(angle),
                                             'distance': Loss(distance),
@@ -180,9 +185,10 @@ def run(
         log_results(engine, val_loader, "Validation")
         pbar.n = pbar.last_print_n = 0
 
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def save_model(engine):
-        
+    @trainer.on(Events.ITERATION_COMPLETED)
+    def newline(engine):
+        # format lines for tqdm
+        print("") 
 
 
     trainer.run(train_loader, max_epochs=epochs)
@@ -214,7 +220,20 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args: argparse.Namespace = parse_args()
-    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, "../../data/embeddings/str_to_ids.pkl", "../../data/embeddings/ids_to_str.pkl", args.beta)
+
+    try:
+        output = subprocess.check_output("free-gpu", shell=True)
+        output=int(output.decode('utf-8'))
+        gpu = output
+        print("claiming gpu {}".format(gpu))
+        th.cuda.set_device(int(gpu))
+        a = torch.tensor([1]).cuda()
+        device = int(gpu)
+    except (IndexError, subprocess.CalledProcessError) as e:
+        device = None
+
+
+    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, "../../data/embeddings/str_to_ids.pkl", "../../data/embeddings/ids_to_str.pkl", args.beta, device)
 
 if __name__ == '__main__':
     main()

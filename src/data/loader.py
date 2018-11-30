@@ -26,7 +26,7 @@ class Timer:
 WRITE_DESTINATION = Path("../../data/processed")
 
 class DataLoader(object):
-    def __init__(self, raw_dir, file_dir, split, batch_size = 256, write_vocab = False):
+    def __init__(self, raw_dir, file_dir, split, batch_size = 256, device=None, write_vocab = False):
         self.raw_dir = raw_dir
         self.quant_file = os.path.join(file_dir, "quantifiers.txt")
         self.comp_file = os.path.join(file_dir, "comparatives.txt")
@@ -34,6 +34,7 @@ class DataLoader(object):
 
         self.split = split
         self.batch_size = batch_size
+        self.device = device
 
         self.data_map, self.label2word, self.comp_dict, vocab = data_maker(self.comp_file, self.quant_file, self.color_file)
         data_map_subset = {k:v for k,v in self.data_map.items() if len(v) > 0}
@@ -110,6 +111,8 @@ class DataLoader(object):
                 #batch_data.append({"reference": torch.FloatTensor(ref), "comparative": " ".join(comp_list), "target": torch.FloatTensor(target_average)})
             # convert to tensor arrays
             as_tensor = (torch.FloatTensor(ref_data), torch.LongTensor(comp_data), torch.FloatTensor(target_data))
+            if self.device:
+                yield tuple([x.cuda(device) for x in as_tensor])
             yield as_tensor
 
     def __len__(self):

@@ -20,7 +20,8 @@ class ColorNet(nn.Module):
             vocab: dict,
             pretrained_embeddings: np.array = None,
             beta: float=0.01,
-            trainable_embeddings: bool = False) -> None:
+            trainable_embeddings: bool = False,
+            device: int =None) -> None:
         super().__init__()
     
         self.color_dim = color_dim
