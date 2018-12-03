@@ -6,4 +6,4 @@
 source /home/eliasse/anaconda3/etc/profile.d/conda.sh
 conda activate dlproj
 cd /home/eliasse/colornet/src/models
-python -u experiment.py
+python -u experiment.py 

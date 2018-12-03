@@ -54,7 +54,7 @@ def get_data_loaders(train_batch_size: int, val_batch_size: int, device: int = N
 
     return training_generator, dev_generator
 
-def prepare_batch(batch, device=None, non_blocking=False):
+def prepare_batch(batch, device, non_blocking=False):
     """Jump through hoops to work with `ignite`.
 
     `ignite` expects (x, y) pairs, but our network takes in dicts and 
@@ -62,6 +62,9 @@ def prepare_batch(batch, device=None, non_blocking=False):
     """
     x = batch[0:-1]
     y = batch[-1]    
+    if device is not None:
+        x = [ins.cuda(device) for ins in x]
+        y = y.cuda(device)
     return x, y
 
 def loss_fn(y_pred: Tuple[th.Tensor], y: th.Tensor):
@@ -80,11 +83,17 @@ def loss_fn(y_pred: Tuple[th.Tensor], y: th.Tensor):
     total_loss = th.mean(agg_loss, dim=0)
     return total_loss
 
-def distance(y_pred: List[Dict], y: None):
-    return sum(output["distance"] for output in y_pred) / len(y_pred)
+def distance(y_pred: Tuple[th.Tensor], y: None):
+    pred,reference,beta = y_pred
+    euc_dist = euclidean_distance(reference + pred, y)
+    return th.mean(euc_dist, dim=0)
+    #return sum(output["distance"] for output in y_pred) / len(y_pred)
 
-def angle(y_pred: List[Dict], y: None):
-    return sum(output["cosine_sim"] for output in y_pred) / len(y_pred)
+def angle(y_pred: Tuple[th.Tensor], y: None):
+    pred,reference,beta = y_pred
+    cosine_sim = nn.CosineSimilarity(dim=0)(pred, y - reference)
+    return th.mean(cosine_sim, dim=0)
+    #return sum(output["cosine_sim"] for output in y_pred) / len(y_pred)
 
 def run(
         train_batch_size: int,
@@ -99,7 +108,7 @@ def run(
         device: int = None
         ) -> None:
     if device is not None:
-        device = torch.device(device)
+        device = th.device(device)
     
     # init checkpointing 
     model_dir = os.path.join(log_dir, "models")
@@ -134,12 +143,14 @@ def run(
     print("Defined model")
     writer = create_summary_writer(model, train_loader, log_dir)
 
-    handler = ModelCheckpoint(model_dir, f"{lr}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True,)
+    handler = ModelCheckpoint(model_dir, f"{lr}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True, require_empty=False)
     optimizer = Adam(model.parameters(), lr=lr)
     trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch, device=device)
     # add checkpointing 
     trainer.add_event_handler(Events.EPOCH_COMPLETED, handler,  {"mymodel": model })
-    evaluator = create_supervised_evaluator(model, prepare_batch=prepare_batch, device=device,
+    evaluator = create_supervised_evaluator(model, 
+                                            prepare_batch=prepare_batch, 
+                                            device=device,
                                             metrics={'loss': Loss(loss_fn),
                                             'angle': Loss(angle),
                                             'distance': Loss(distance),
@@ -214,24 +225,25 @@ def parse_args() -> argparse.Namespace:
                         help="Where the embeddings are stored")
     parser.add_argument("--beta", type=float, default=0.3/0.7,
                         help="Weight between objectives: loss = (-cosine_sim) + β * distance")
-
+    parser.add_argument("--use-gpu", type=bool, default=False)
     args = parser.parse_args()
     return args
 
 def main():
     args: argparse.Namespace = parse_args()
-
-    try:
-        output = subprocess.check_output("free-gpu", shell=True)
-        output=int(output.decode('utf-8'))
-        gpu = output
-        print("claiming gpu {}".format(gpu))
-        th.cuda.set_device(int(gpu))
-        a = torch.tensor([1]).cuda()
-        device = int(gpu)
-    except (IndexError, subprocess.CalledProcessError) as e:
+    if args.use_gpu:
+        try:
+            output = subprocess.check_output("free-gpu", shell=True)
+            output=int(output.decode('utf-8'))
+            gpu = output
+            print("claiming gpu {}".format(gpu))
+            th.cuda.set_device(int(gpu))
+            a = th.tensor([1]).cuda()
+            device = int(gpu)
+        except (IndexError, subprocess.CalledProcessError) as e:
+            device = None
+    else:
         device = None
-
 
     run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, "../../data/embeddings/str_to_ids.pkl", "../../data/embeddings/ids_to_str.pkl", args.beta, device)
 

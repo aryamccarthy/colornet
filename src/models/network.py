@@ -26,6 +26,7 @@ class ColorNet(nn.Module):
     
         self.color_dim = color_dim
         self.vocab = vocab
+        self.device = device
         # embedding layer
         try:
             assert(pretrained_embeddings.shape[0] == len(self.vocab))
@@ -51,8 +52,12 @@ class ColorNet(nn.Module):
         output = {}
         reference = instance[0]
         comparative_as_ints = instance[1]
+        if self.device is not None:
+            comparative_as_ints = comparative_as_ints.cuda(self.device)
+            reference = reference.cuda(self.device)
         comparative_as_embedding = self.embedding(comparative_as_ints)
         comparative_as_embedding = comparative_as_embedding.reshape((-1, comparative_as_embedding.size()[1] * comparative_as_embedding.size()[2]))
+        
         
         inputs = th.cat([comparative_as_embedding, reference], dim=1)
         x = self.fc1(inputs)
