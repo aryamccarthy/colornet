@@ -50,6 +50,7 @@ if __name__ == '__main__':
     device = get_device(use_gpu)
     batch_size = 2048
     model = th.load(model_path, map_location=device)
+    model.device = device # hax
     model.eval()
     model = model.cuda(device)
 
