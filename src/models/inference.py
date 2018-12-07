@@ -12,7 +12,6 @@ from network import ColorNet
 from data.vocab import ExtensibleVocab
 import numpy as np
 
-
 def angle(y_pred: Tuple[th.Tensor], y: None):
     pred,reference,beta = y_pred
     cosine_sim = nn.CosineSimilarity(dim=0)(pred, y - reference)
@@ -47,34 +46,8 @@ if __name__ == '__main__':
     use_gpu = args.use_gpu
     model_path = args.model_path
 
-
-    # load vocab from pickled dict
-    str_to_ids = "../../data/embeddings/str_to_ids.pkl"
-    ids_to_str  = "../../data/embeddings/ids_to_str.pkl"
-
-    with open(str_to_ids, "rb") as f1, open(ids_to_str, "rb") as f2:
-        str_to_ids = pickle.load(f1)
-        ids_to_str = pickle.load(f2)
-
-    # get the corresponding vectors, sorted by vocab index
-    words = str_to_ids.keys() 
-    freqs = Counter(words)
-    vocab = ExtensibleVocab(freqs, vectors='fasttext.simple.300d')
-    sorted_vocab_items = sorted(str_to_ids.items(), key=lambda x: x[1])
-    num_embeddings, embedding_dim = len(words), list(vocab["<PAD>"].size())[0]
-
-    # init empty array for embeddings
-    print(num_embeddings, embedding_dim)
-    embedding_arr = np.zeros((num_embeddings, embedding_dim))
-    
-    # fill the array in order
-    for word, idx in sorted_vocab_items:
-        corresponding_embedding = vocab[word]
-        embedding_arr[idx,:] = corresponding_embedding
-
-    device = get_device(use_gpu)
-
     # load the model
+    device = get_device(use_gpu)
     batch_size = 2048
     model = th.load(model_path, map_location=device)
     model.eval()
@@ -83,7 +56,6 @@ if __name__ == '__main__':
     # get the data loader
     test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test", batch_size=batch_size, device=device)
 
-    # import pdb;pdb.set_trace()
     batch_count = 0
     inst_count = 0
     cos_accum = 0.0
@@ -103,7 +75,3 @@ if __name__ == '__main__':
             print('batch_count:%d, inst_count:%d, avg_cosine:%.3f' % (batch_count, inst_count, cos_accum / batch_count))
 
     print(cos_accum / batch_count)
-
-
-
-    
