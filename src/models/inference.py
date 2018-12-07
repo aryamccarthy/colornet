@@ -38,41 +38,43 @@ def get_device(use_gpu):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--use-gpu", action='store_true')
-    parser.add_argument("--model-path", required=True)
-    args = parser.parse_args()
+    with th.no_grad():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--use-gpu", action='store_true')
+        parser.add_argument("--model-path", required=True)
+        args = parser.parse_args()
 
-    use_gpu = args.use_gpu
-    model_path = args.model_path
+        use_gpu = args.use_gpu
+        model_path = args.model_path
 
-    # load the model
-    device = get_device(use_gpu)
-    batch_size = 2048
-    model = th.load(model_path, map_location=device)
-    model.device = device # hax
-    model.eval()
-    model = model.cuda(device)
+        # load the model
+        device = get_device(use_gpu)
+        batch_size = 2048
+        model = th.load(model_path, map_location=device)
+        model.device = device # hax
+        model.eval()
 
-    # get the data loader
-    test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test", batch_size=batch_size, device=device)
+        model = model.cuda(device)
 
-    batch_count = 0
-    inst_count = 0
-    cos_accum = 0.0
-    for inst in test_dl:
+        # get the data loader
+        test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test", batch_size=batch_size, device=device)
 
-        # the dataloader should already do this...?
-        # but it complains if we don't do this
-        inst = [_.cuda(device) for _ in inst]
+        batch_count = 0
+        inst_count = 0
+        cos_accum = 0.0
+        for inst in test_dl:
 
-        gold = inst[2]
-        result = model(inst)
-        cos_accum += angle(result, gold)
+            # the dataloader should already do this...?
+            # but it complains if we don't do this
+            inst = [_.cuda(device) for _ in inst]
 
-        batch_count += 1
-        inst_count += batch_size
-        if batch_count % 10 == 0:
-            print('batch_count:%d, inst_count:%d, avg_cosine:%.3f' % (batch_count, inst_count, cos_accum / batch_count))
+            gold = inst[2]
+            result = model(inst)
+            cos_accum += angle(result, gold)
 
-    print(cos_accum / batch_count)
+            batch_count += 1
+            inst_count += batch_size
+            if batch_count % 10 == 0:
+                print('batch_count:%d, inst_count:%d, avg_cosine:%.3f' % (batch_count, inst_count, cos_accum / batch_count))
+
+        print(cos_accum / batch_count)
