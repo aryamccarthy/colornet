@@ -24,6 +24,7 @@ class Timer:
 
 
 WRITE_DESTINATION = Path("../../data/processed")
+VERBOSE = False
 
 class DataLoader(object):
     def __init__(self, raw_dir, file_dir, split, batch_size = 256, device=None, write_vocab = False):
@@ -112,7 +113,8 @@ class DataLoader(object):
             # convert to tensor arrays
             as_tensor = (torch.FloatTensor(ref_data), torch.LongTensor(comp_data), torch.FloatTensor(target_data))
             if self.device is not None:
-                print("YIELDING CUDA")
+                if VERBOSE:
+                    print("YIELDING CUDA")
                 yield tuple([x.cuda(self.device) for x in as_tensor])
             yield as_tensor
 
