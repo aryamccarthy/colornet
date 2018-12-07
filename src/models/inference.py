@@ -76,8 +76,7 @@ if __name__ == '__main__':
 
     # load the model
     batch_size = 2048
-    model = ColorNet(color_dim=3, vocab=str_to_ids, pretrained_embeddings=embedding_arr, beta=0.3/0.7, device=device)
-    model.load_state_dict(th.load(model_path))
+    model = th.load(model_path, map_location=device)
     model.eval()
     model = model.cuda(device)
 
