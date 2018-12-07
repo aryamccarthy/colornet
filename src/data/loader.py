@@ -117,6 +117,7 @@ class DataLoader(object):
                     print("YIELDING CUDA")
                 yield tuple([x.cuda(self.device) for x in as_tensor])
             yield as_tensor
+        return
 
     def __len__(self):
         return len(self.data) // self.batch_size
