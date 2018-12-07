@@ -112,12 +112,13 @@ class DataLoader(object):
                 #batch_data.append({"reference": torch.FloatTensor(ref), "comparative": " ".join(comp_list), "target": torch.FloatTensor(target_average)})
             # convert to tensor arrays
             as_tensor = (torch.FloatTensor(ref_data), torch.LongTensor(comp_data), torch.FloatTensor(target_data))
+
             if self.device is not None:
                 if VERBOSE:
                     print("YIELDING CUDA")
                 yield tuple([x.cuda(self.device) for x in as_tensor])
-            yield as_tensor
-        return
+            else:
+                yield as_tensor
 
     def __len__(self):
         return len(self.data) // self.batch_size
