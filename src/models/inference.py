@@ -15,7 +15,7 @@ import numpy as np
 
 def angle(y_pred: Tuple[th.Tensor], y: None):
     pred,reference,beta = y_pred
-    cosine_sim = nn.CosineSimilarity(dim=0)(pred, y)
+    cosine_sim = nn.CosineSimilarity(dim=0)(pred, y - reference)
     return th.mean(cosine_sim, dim=0)
 
 def get_device(use_gpu):
@@ -72,12 +72,16 @@ if __name__ == '__main__':
         corresponding_embedding = vocab[word]
         embedding_arr[idx,:] = corresponding_embedding
 
-
-    
     device = get_device(use_gpu)
+
+    # load the model
     batch_size = 2048
     model = ColorNet(color_dim=3, vocab=str_to_ids, pretrained_embeddings=embedding_arr, beta=0.3/0.7, device=device)
+    model.load_state_dict(th.load(model_path))
+    model.eval()
     model = model.cuda(device)
+
+    # get the data loader
     test_dl = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "test", batch_size=batch_size, device=device)
 
     # import pdb;pdb.set_trace()
