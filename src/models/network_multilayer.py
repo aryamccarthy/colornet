@@ -28,7 +28,7 @@ class ColorNet(nn.Module):
         self.color_dim = color_dim
         self.vocab = vocab
         self.device = device
-#        self.n_layers = n_layers
+        self.n_layers = n_layers
         print(f"n_layers: {n_layers}")
         # embedding layer
         try:
@@ -47,7 +47,7 @@ class ColorNet(nn.Module):
            self.embedding.requires_grad = False 
         self.fc1 = nn.Linear(self.embedding_dim * 2 + COLOR_DIM, FC1_OUTPUT_SIZE)
         self.fc2 = nn.Linear(FC1_OUTPUT_SIZE + 3, COLOR_DIM)
-#        self.linear_layers = nn.ModuleList([nn.Linear(FC1_OUTPUT_SIZE, FC1_OUTPUT_SIZE) for i in range(n_layers-1)])
+        self.linear_layers = nn.ModuleList([nn.Linear(FC1_OUTPUT_SIZE, FC1_OUTPUT_SIZE) for i in range(n_layers-1)])
         self.nonlinearity = nn.ReLU()
 
         self.beta = beta
@@ -67,9 +67,9 @@ class ColorNet(nn.Module):
         
         x = self.fc1(inputs)
         x = self.nonlinearity(x)
-#        for layer in self.linear_layers:
-#            x = layer(x)
-#            x = self.nonlinearity(x)
+        for layer in self.linear_layers:
+            x = layer(x)
+            x = self.nonlinearity(x)
         pred = self.fc2(th.cat([x, reference], dim=1))
 
         return pred, reference, self.beta

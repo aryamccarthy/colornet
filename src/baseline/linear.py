@@ -81,7 +81,7 @@ def run(args):
             loss.backward()
             optimizer.step()
             print(f"epoch: {i}, loss: {loss.data[0]}") 
-        torch.save(model.state_dict(), "../../models/baseline/{args.lr}_linear_{i}")
+        torch.save(model, "../../models/baseline/{args.lr}_linear_{i}")
 
 
 if __name__ == "__main__":

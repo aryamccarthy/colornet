@@ -4,7 +4,7 @@ import pickle
 import subprocess
 from collections import Counter
 from typing import Tuple
-
+import os
 import torch as th
 from torch import nn
 from data import DataLoader
@@ -76,5 +76,8 @@ if __name__ == '__main__':
             inst_count += batch_size
             if batch_count % 10 == 0:
                 print('batch_count:%d, inst_count:%d, avg_cosine:%.3f' % (batch_count, inst_count, cos_accum / batch_count))
-
+        model_name = os.path.basename(args.model_path)
+        print(model_name)
+        with open(f"../../results/{model_name}", "w") as f1:
+            f1.write(str(cos_accum / batch_count))
         print(cos_accum / batch_count)
