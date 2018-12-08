@@ -47,8 +47,8 @@ def get_data_loaders(train_batch_size: int, val_batch_size: int, device: int = N
  #   training_dataset = ColorDataset("train")
 #    training_generator = DataLoader(training_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=collate)
 
-    training_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train", device=device)
-    dev_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev", device=device)
+    training_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "train", batch_size = train_batch_size, device=device)
+    dev_generator = DataLoader("../../data/raw/xkcd_colordata", "../../data/raw/", "dev", batch_size = val_batch_size, device=device)
     #dev_dataset = ColorDataset("dev")
  #   dev_generator = DataLoader(dev_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=collate)
 
@@ -105,6 +105,7 @@ def run(
         str_to_ids: Path,
         ids_to_str: Path,
         beta: float,
+        n_layers: int = 3, 
         device: int = None
         ) -> None:
     if device is not None:
@@ -139,11 +140,11 @@ def run(
     train_loader, val_loader = get_data_loaders(train_batch_size, val_batch_size, device=device)
     print("Got loaders")
     print("Defining model...")
-    model = ColorNet(color_dim=3, vocab=str_to_ids, pretrained_embeddings = embedding_arr, beta=beta, device=device)
+    model = ColorNet(color_dim=3,n_layers = n_layers,  vocab=str_to_ids, pretrained_embeddings = embedding_arr, beta=beta, device=device)
     print("Defined model")
     writer = create_summary_writer(model, train_loader, log_dir)
 
-    handler = ModelCheckpoint(model_dir, f"{lr}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True, require_empty=False)
+    handler = ModelCheckpoint(model_dir, f"{lr}-{n_layers}-{beta}-{train_batch_size}", save_interval = 2, n_saved = 10, create_dir=True, require_empty=False)
     optimizer = Adam(model.parameters(), lr=lr)
     trainer = create_supervised_trainer(model, optimizer, loss_fn=loss_fn, prepare_batch=prepare_batch, device=device)
     # add checkpointing 
@@ -209,8 +210,8 @@ def run(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', type=int, default=4,
-                        help='input batch size for training (default: 64)')
+    parser.add_argument('--batch_size', type=int, default=2048,
+                        help='input batch size for training (default: 2048)')
     parser.add_argument('--val_batch_size', type=int, default=1000,
                         help='input batch size for validation (default: 1000)')
     parser.add_argument('--epochs', type=int, default=10,
@@ -226,6 +227,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--beta", type=float, default=0.3/0.7,
                         help="Weight between objectives: loss = (-cosine_sim) + β * distance")
     parser.add_argument("--use-gpu", type=bool, default=False)
+    parser.add_argument("--layers", type=int, default = 1)
     args = parser.parse_args()
     return args
 
@@ -245,7 +247,7 @@ def main():
     else:
         device = None
 
-    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, "../../data/embeddings/str_to_ids.pkl", "../../data/embeddings/ids_to_str.pkl", args.beta, device)
+    run(args.batch_size, args.val_batch_size, args.epochs, args.lr, args.log_interval, args.log_dir, "../../data/embeddings/str_to_ids.pkl", "../../data/embeddings/ids_to_str.pkl", args.beta, args.layers, device)
 
 if __name__ == '__main__':
     main()
